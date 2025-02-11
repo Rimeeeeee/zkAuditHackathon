@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT
 import "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 pragma solidity ^0.8.13;
 error NFTAuction__NotEqualToPlatformFee();
 error NFTAuction__PlatformFeeTransferFailed();
 error NFTAuction__TransferFailed();
 error NFTAuction__NotEnoughTokens();
-
-contract NFTAuction is ERC721URIStorage {
+error NFTAuction__NotApproved();
+contract NFTAuction is ERC721URIStorage,ReentrancyGuard {
     address private immutable i_owner;
     uint256 tokenId = 0;
     uint256 totalItemsSold = 0;
     uint256 PLATFORM_FEE = 0.01 ether;
-
+    address permittedContract;
     struct NFT {
         uint256 tokenId;
         address payable seller;
@@ -30,6 +31,7 @@ contract NFTAuction is ERC721URIStorage {
     mapping(uint256 => NFT) public idToNFT;
     mapping(uint256=>NFT) public NFTInAuction;
     mapping(uint256=>mapping(address=>uint256)) public NFTCommitment;
+    mapping(uint256=>mapping(address=>bool)) public approved;
     // events
     event TokenListedEvent(
         uint256 indexed tokenId,
@@ -51,7 +53,7 @@ contract NFTAuction is ERC721URIStorage {
         uint256 tokenValue,
         uint256 auctionDuration,
         uint256 revealDuration
-    ) public payable {
+    ) public payable nonReentrant {
         if (tokenValue < PLATFORM_FEE)
             revert NFTAuction__NotEqualToPlatformFee();
         // make approve in the frontend
@@ -107,14 +109,21 @@ contract NFTAuction is ERC721URIStorage {
     ) public view returns (NFT[] memory) {
         return NFTListedByAddress[a];
     }
-
+    function setContractPermission(address _contract)public onlyOwner{
+        permittedContract=_contract;
+    }
     function getNFTOwnedByAddress(
         address a
     ) public view returns (NFT[] memory) {
         return NFTOwnedByAddress[a];
     }
-
-    function sellNFT(uint256 _tokenId,address buyer) public payable {
+    function updateApproval(uint256 _tokenId,address a)public onlyPermittedContract{
+        approved[_tokenId][a]=true;
+    }
+    function sellNFT(uint256 _tokenId,address buyer) public payable nonReentrant{
+        if(approved[_tokenId][msg.sender]==false){
+            revert NFTAuction__NotApproved();
+        }
         uint256 price = idToNFT[_tokenId].price;
         address seller = idToNFT[_tokenId].seller;
        // if (tokenValue * (10 ** icsToken.decimals()) != price)
@@ -206,6 +215,10 @@ contract NFTAuction is ERC721URIStorage {
         require(x<block.timestamp&&block.timestamp<=y,"NFT is not in reveal phase");
         _;
     }
+    modifier onlyPermittedContract(){
+        require(msg.sender==permittedContract,"Only Permitted Contract can Access This");
+        _;
+    }
 }
 contract ZkvAttestationContract {
     /// The hash of the identifier of the proving system used (groth16 in this case)
@@ -249,7 +262,7 @@ contract ZkvAttestationContract {
         /// If a valid proof has been posted to zkVerify, then perform app-specific logic (e.g. mint a NFT).
         /// In this simple example, we just record the address of the sender inside a map and emit an event.
         hasSubmittedValidProof[msg.sender] = true;
-        nftContract.sellNFT(tokenId,msg.sender);
+        nftContract.updateApproval(tokenId, msg.sender);
         emit SuccessfulProofSubmission(msg.sender);
     }
 
