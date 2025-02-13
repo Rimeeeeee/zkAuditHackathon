@@ -9,6 +9,7 @@ import CreateToken from "./pages/CreateNFT";
 import SideBar from "./components/SideBar";
 import TopBar from "./components/Header";
 import AllNFT from "./pages/AllNFT";
+import VerifyBidPage from "./pages/VerifyBid";
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -47,6 +48,14 @@ const App: React.FC = () => {
           element={
             <Layout>
               <AllNFT />
+            </Layout>
+          }
+        />
+         <Route
+          path="/verify"
+          element={
+            <Layout>
+              <VerifyBidPage />
             </Layout>
           }
         />

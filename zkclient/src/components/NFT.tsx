@@ -4,6 +4,8 @@ import { useNFTContext } from "../context/context";
 import { download } from "thirdweb/storage";
 import { useActiveAccount } from "thirdweb/react";
 import { createWallet } from "thirdweb/wallets";
+import axios from "axios";
+
 interface NFTProps {
   sellerAddress: string;
   price: number;
@@ -22,9 +24,11 @@ const NFT: React.FC<NFTProps> = ({
   revealDuration,
 }) => {
   const [image, setImage] = useState("");
+  const [commitment, setCommitment] = useState<string>("");
   const [bid, setBid] = useState<string>("");
   const [nonce, setNonce] = useState<string>("");
   const { contract, client } = useNFTContext();
+  const [error, setError] = useState<string | null>(null);
   const activeAccountAddress = useActiveAccount()?.address;
 
   const [isEnded, setIsEnded] = useState<boolean>(false);
@@ -78,7 +82,7 @@ const NFT: React.FC<NFTProps> = ({
 
   const buyNFTs = async (tokenId: number, price: number) => {
     try {
-      await approve(price);
+      //await approve(price);
 
       const wallet = createWallet("io.metamask");
       const account = await wallet.connect({ client });
@@ -98,23 +102,48 @@ const NFT: React.FC<NFTProps> = ({
       console.error("Failed to buy NFT:", error);
     }
   };
-
+  
   const submitBid = async () => {
-    if (!bid || !nonce) {
+    if (!commitment) {
       console.error("Bid and nonce are required.");
       return;
     }
+    
     //!get hash
+    /*const sendBidAndNonce = async (bid: string, nonce: string) => {
+      try {
+          const response = await fetch('http://localhost:3000/calculate-commitment', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ bid, nonce }),
+          });
 
+          if (!response.ok) {
+              throw new Error('Network response was not ok');
+          }
+
+          const data = await response.json();
+          setCommitment(data.commitment);
+          console.log('Commitment:', data.commitment);
+         
+          setError(null); // Clear any previous errors
+      } catch (error) {
+          console.error('Error sending bid and nonce:', error);
+          setError('Failed to calculate commitment. Please try again.');
+      }
+  };
+  sendBidAndNonce(bid, nonce);*/
     const wallet = createWallet("io.metamask");
     const account = await wallet.connect({ client });
     const transaction = await prepareContractCall({
       contract: contract,
       method:
-        " function setCommitmentForNFT(uint256 _tokenId,uint256 _commitment)",
+        "function setCommitmentForNFT(uint256 _tokenId,uint256 _commitment)",
       params: [
         BigInt(tokenId),
-        //! BigInt(commitment)),
+        BigInt(commitment),
       ],
     });
 
@@ -129,11 +158,38 @@ const NFT: React.FC<NFTProps> = ({
       "Commitment Submission successful, transaction hash:",
       transactionHash,
     );
+    console.log("Commitment:", commitment);
   };
-
+  const fetchCommitment = async (tokenId:string,bid:string,nonce:string) => {
+    if(activeAccountAddress){
+    try {
+      const commitment = await readContract({
+        contract,
+        method: "function NFTCommitment(uint256, address) view returns (uint256)",
+        params: [BigInt(tokenId), activeAccountAddress],
+      });
+      console.log(commitment,tokenId,bid,nonce,activeAccountAddress);
+      // Send bidNonce and commitment to the backend
+      await axios.post("http://localhost:5000/verify-bid", {
+        tokenId: tokenId.toString(),
+        signer: activeAccountAddress.toString(),  // Ensure it's correct
+        bidAmount: bid.toString(),
+        randomness: nonce.toString(),
+        commitment: commitment.toString()
+    });
+  
+      console.log("Commitment sent successfully:", commitment);
+    } catch (error) {
+      console.error("Error fetching or sending commitment:", error);
+    }
+  }
+  };
+  
+  
   const revealBid = async () => {
     // Logic to reveal bid and nonce
     //! call the verification here
+    fetchCommitment(tokenId.toString(),bid,nonce);
     console.log("Revealing bid and nonce...");
   };
 
@@ -179,23 +235,17 @@ const NFT: React.FC<NFTProps> = ({
         <div className="mt-4">
           <input
             type="text"
-            placeholder="Enter your bid"
-            value={bid}
-            onChange={(e) => setBid(e.target.value)}
+            placeholder="Enter your commitment"
+            value={commitment}
+            onChange={(e) => setCommitment(e.target.value)}
             className="w-full p-2 mb-2 rounded-md border-2 border-white bg-transparent text-white"
           />
-          <input
-            type="text"
-            placeholder="Enter nonce"
-            value={nonce}
-            onChange={(e) => setNonce(e.target.value)}
-            className="w-full p-2 mb-4 rounded-md border-2 border-white bg-transparent text-white"
-          />
+        
           <button
             className="w-full py-2 bg-blue-500 hover:bg-blue-700 text-white font-bold rounded-md"
             onClick={submitBid}
           >
-            Submit Bid
+            Submit Commitment
           </button>
         </div>
       )}

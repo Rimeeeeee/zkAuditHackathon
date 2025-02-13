@@ -126,7 +126,7 @@ contract NFTAuction is ERC721URIStorage,ReentrancyGuard {
         if(approved[_tokenId][msg.sender]==false){
             revert NFTAuction__NotApproved();
         }
-        uint256 price = maxBid[_tokenId];
+        uint256 price = maxBidAmount[_tokenId];
         address seller = idToNFT[_tokenId].seller;
        // if (tokenValue * (10 ** icsToken.decimals()) != price)
             //revert NotEnoughTokens();

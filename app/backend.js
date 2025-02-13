@@ -19,9 +19,6 @@ const zkvAttestationAddress = process.env.ETH_APP_CONTRACT_ADDRESS;
 
 const nftAuctionABI = [
     "function createToken(string memory tokenURI, uint256 price,uint256 auctionDuration, uint256 revealDuration) public",
-    "function getNFTOwnedByAddress(address a) view returns (tuple(uint256 tokenId, address seller, uint256 price, bool currentlyListed, uint256 creationTime, uint256 auctionDuration, uint256 revealDuration)[] memory)",
-    "function getPlatformFee() public view returns (uint256)",
-    "function getNFTListedByAddress(address a) view returns (tuple(uint256 tokenId, address seller, uint256 price, bool currentlyListed, uint256 creationTime, uint256 auctionDuration, uint256 revealDuration)[] memory)",
     "function idToNFT(uint256 tokenId) view returns (tuple(uint256 tokenId, address seller, uint256 price, bool currentlyListed, uint256 creationTime, uint256 auctionDuration, uint256 revealDuration) memory)",
     "function getAllNFTs() view returns (tuple(uint256 tokenId, address seller, uint256 price, bool currentlyListed, uint256 creationTime, uint256 auctionDuration, uint256 revealDuration)[] memory)",
     "function setCommitmentForNFT(uint256 _tokenId, uint256 _commitment) public",
@@ -47,16 +44,6 @@ app.post('/create-nft', async (req, res) => {
     try {
       const { signer, tokenURI, price, auctionDuration, revealDuration } = req.body;
   
-      // Validate input
-      if (!signer) {
-        return res.status(400).json({ error: "Wallet signer address required" });
-      }
-  
-      if (!ethers.isAddress(signer)) {
-          return res.status(400).json({ error: "Invalid signer address" });
-      }
-  
-      // Get the signer from the provider using the provided address
       const wallet = new ethers.Wallet(signer,provider);  // Use provider to get the Signer
       console.log("Wallet/Signer:", wallet);
   
