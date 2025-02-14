@@ -28,6 +28,7 @@ interface NFTContextProps {
   client: ThirdwebClient;
   wallet: any;
   account: any;
+  zkContract:any;
 }
 
 // Create the context
@@ -60,7 +61,7 @@ export const NFTContextProvider = ({ children }: NFTContextProviderProps) => {
     useState<ethers.providers.Web3Provider | null>(null);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
   const [contract, setContract] = useState<any>(null); // Add contract state
-
+  const [zkContract, zksetContract] = useState<any>(null);
   useEffect(() => {
     // Initialize provider and signer
     //const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -77,8 +78,15 @@ export const NFTContextProvider = ({ children }: NFTContextProviderProps) => {
     });
     console.log("Contract:", _contract);
     setContract(_contract); // Set the contract
-  }, []); // Empty dependency array ensures this runs only once
-
+  // Empty dependency array ensures this runs only once
+  const _zkcontract = getContract({
+    client,
+    chain: defineChain(Number(import.meta.env.VITE_CHAIN_ID)), // Define the chain ID
+    address: import.meta.env.VITE_ZKCONTRACT_ADDRESS as string, // Replace with your contract address
+  });
+  console.log("Contract:", _zkcontract);
+  zksetContract(_zkcontract); // Set the contract
+}, []);
   return (
     <NFTContext.Provider
       value={{
@@ -90,6 +98,7 @@ export const NFTContextProvider = ({ children }: NFTContextProviderProps) => {
         client,
         wallet,
         account,
+        zkContract
       }}
     >
       {children}

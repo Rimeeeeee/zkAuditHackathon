@@ -10,6 +10,7 @@ import SideBar from "./components/SideBar";
 import TopBar from "./components/Header";
 import AllNFT from "./pages/AllNFT";
 import VerifyBidPage from "./pages/VerifyBid";
+import ProvideContractPermission from "./pages/providePermission";
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -59,7 +60,16 @@ const App: React.FC = () => {
             </Layout>
           }
         />
+        <Route
+          path="/permission"
+          element={
+            <Layout>
+              < ProvideContractPermission/>
+            </Layout>
+          }
+        />
       </Routes>
+      
     </Router>
   );
 };

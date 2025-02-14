@@ -5,6 +5,7 @@ import { download } from "thirdweb/storage";
 import { useActiveAccount } from "thirdweb/react";
 import { createWallet } from "thirdweb/wallets";
 import axios from "axios";
+import { ethers } from "ethers";
 
 interface NFTProps {
   sellerAddress: string;
@@ -27,7 +28,8 @@ const NFT: React.FC<NFTProps> = ({
   const [commitment, setCommitment] = useState<string>("");
   const [bid, setBid] = useState<string>("");
   const [nonce, setNonce] = useState<string>("");
-  const { contract, client } = useNFTContext();
+  const { contract, client,zkContract } = useNFTContext();
+  const [verified, setVerified] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const activeAccountAddress = useActiveAccount()?.address;
 
@@ -64,6 +66,7 @@ const NFT: React.FC<NFTProps> = ({
   ).toLocaleString();
 
   useEffect(() => {
+    
     const currentTime = Date.now();
     const auctionEndTime = creationTime * 1000 + auctionDuration * 1000;
     const revealEndTime =
@@ -80,17 +83,40 @@ const NFT: React.FC<NFTProps> = ({
     }
   }, [creationTime, auctionDuration, revealDuration]);
 
-  const buyNFTs = async (tokenId: number, price: number) => {
+  const buyNFTs = async (tokenId: number) => {
+    if(activeAccountAddress){
     try {
       //await approve(price);
 
       const wallet = createWallet("io.metamask");
       const account = await wallet.connect({ client });
+      const maxBidAmount = await readContract({
+        contract,
+        method: "function maxBidAmount(uint256) view returns (uint256)",
+        params: [BigInt(tokenId)]
+      });
+      console.log(maxBidAmount.toString());
 
+      const maxBid = await readContract({
+        contract,
+        method: "function maxBid(uint256) view returns (address)",
+        params: [BigInt(tokenId)]
+      });
+      console.log(maxBid);
+      
+      const verification = await readContract({
+        contract:zkContract,
+        method: "function hasSubmittedValidProof(address) view returns (bool)",
+        params: [activeAccountAddress]
+      });
+      console.log(verification);
+      setVerified(verification);
+      if(verification){
       const transaction = await prepareContractCall({
         contract,
-        method: "function sellNFT(uint256 _tokenId, uint256 tokenValue)",
-        params: [BigInt(tokenId), BigInt(price)],
+        method: "function sellNFT(uint256 _tokenId,address buyer)",
+        params: [BigInt(tokenId),activeAccountAddress],
+        value: ethers.parseEther(maxBidAmount.toString())
       });
 
       const { transactionHash } = await sendTransaction({
@@ -98,9 +124,12 @@ const NFT: React.FC<NFTProps> = ({
         account,
       });
       console.log("Transaction successful:", transactionHash);
+    }
     } catch (error) {
       console.error("Failed to buy NFT:", error);
     }
+    
+  }
   };
   
   const submitBid = async () => {
@@ -192,7 +221,25 @@ const NFT: React.FC<NFTProps> = ({
     fetchCommitment(tokenId.toString(),bid,nonce);
     console.log("Revealing bid and nonce...");
   };
-
+  useEffect(() => {
+    async function fetchVerification() {
+      if (activeAccountAddress) {
+        try {
+          const verification = await readContract({
+            contract: zkContract,
+            method: "function hasSubmittedValidProof(address) view returns (bool)",
+            params: [activeAccountAddress],
+          });
+          setVerified(verification);
+          console.log("Verification status:", verification);
+        } catch (error) {
+          console.error("Failed to fetch verification:", error);
+        }
+      }
+    }
+    
+    fetchVerification();
+  }, [activeAccountAddress]); // ✅ Dependency added
   return (
     <div className="w-full max-w-xs mx-auto bg-zinc-950 p-4 border-2 border-white rounded-lg shadow-lg text-white">
       <div>
@@ -222,7 +269,11 @@ const NFT: React.FC<NFTProps> = ({
           <strong>Reveal End:</strong> {revealEnd}
         </p>
       </div>
-
+    {verified &&(
+      <div className="absolute top-2 right-2 bg-green-600 text-white text-sm px-2 py-1 rounded-full">
+      Proof Verified ✅
+    </div>
+    )}
       {/* Ended tag */}
       {isEnded && (
         <div className="absolute top-2 right-2 bg-red-600 text-white text-sm px-2 py-1 rounded-full">
@@ -287,7 +338,7 @@ const NFT: React.FC<NFTProps> = ({
       {sellerAddress !== activeAccountAddress && (
         <button
           className="w-full py-3 mt-4 bg-gradient-to-r from-teal-400 to-teal-600 text-white font-bold rounded-md"
-          onClick={() => buyNFTs(tokenId, price)}
+          onClick={() => buyNFTs(tokenId)}
         >
           Buy Now
         </button>
